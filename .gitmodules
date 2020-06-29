@@ -1,0 +1,3 @@
+[submodule "Tami/Discord-Utils"]
+	path = Tami/Discord-Utils
+	url = https://github.com/Xwilarg/Discord-Utils
