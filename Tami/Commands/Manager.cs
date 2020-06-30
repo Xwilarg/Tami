@@ -1,5 +1,6 @@
 ﻿using Discord;
 using Discord.Commands;
+using DiscordUtils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,7 +16,17 @@ namespace Tami.Commands
             if (msg.Length == 0)
                 return;
 
-            var commands = Parse(msg);
+            var me = Context.Guild.GetUser(Program.P.Client.CurrentUser.Id);
+            Command[] commands;
+            try
+            {
+                commands = await ParseAsync(me.GuildPermissions, msg, Context.Guild, me);
+            }
+            catch (Exception e)
+            {
+                await Context.Channel.SendMessageAsync(e.Message);
+                return;
+            }
             if (commands == null || commands.Length == 0) // Invalid command
                 return;
 
@@ -64,21 +75,40 @@ namespace Tami.Commands
                     Text = countYes + " - " + countNo
                 }
             }.Build());
-            foreach (var cmd in commands)
+            try
             {
-                switch (cmd.order)
+                foreach (var cmd in commands)
                 {
-                    case Order.SAY:
-                        await Context.Channel.SendMessageAsync(cmd.arg);
-                        break;
+                    switch (cmd.order)
+                    {
+                        case Order.SAY:
+                            await Context.Channel.SendMessageAsync((string)cmd.arg);
+                            break;
 
-                    default:
-                        throw new ArgumentException("Invalid order " + cmd.order.ToString());
+                        case Order.CREATE:
+                            await Context.Guild.CreateTextChannelAsync((string)cmd.arg);
+                            break;
+
+                        case Order.DESTROY:
+                            await ((ITextChannel)cmd.arg).DeleteAsync();
+                            break;
+
+                        case Order.KICK:
+                            await ((IGuildUser)cmd.arg).KickAsync();
+                            break;
+
+                        default:
+                            throw new ArgumentException("Invalid order " + cmd.order.ToString());
+                    }
                 }
+            }
+            catch (Exception e)
+            {
+                await Context.Channel.SendMessageAsync(e.Message);
             }
         }
 
-        public static Command[] Parse(string message)
+        public static async Task<Command[]> ParseAsync(GuildPermissions perms, string message, IGuild guild, IGuildUser me)
         {
             List<Command> commands = new List<Command>();
             foreach (string s in message.Split("&&"))
@@ -90,10 +120,47 @@ namespace Tami.Commands
                 {
                     if (order.ToString() == tmpSplit[0].ToUpper())
                     {
+                        string args = string.Join(" ", tmpSplit.Skip(1));
+                        object argsObj;
+                        switch (order)
+                        {
+                            case Order.SAY:
+                                if (args.Length == 0) throw new ParsingError("SAY must be given the sentence to say");
+                                argsObj = args;
+                                break;
+
+                            case Order.CREATE:
+                                if (!perms.ManageChannels) throw new ParsingError("CREATE need me to have the Manage Channels permission");
+                                if (args.Length == 0) throw new ParsingError("CREATE must be given the channel name to create");
+                                argsObj = args;
+                                break;
+
+                            case Order.DESTROY:
+                                if (!perms.ManageChannels) throw new ParsingError("DESTROY need me to have the Manage Channels permission");
+                                if (args.Length == 0) throw new ParsingError("DESTROY must be given the channel name to destroy");
+                                argsObj = await Utils.GetTextChannel(args, guild);
+                                if (argsObj == null) throw new ParsingError("DESTROY must be given a valid text channel in parameter");
+                                break;
+
+                            case Order.KICK:
+                                if (!perms.KickMembers) throw new ParsingError("KICK need me to have the Kick Members permission");
+                                if (args.Length == 0) throw new ParsingError("KICK must be given the user name to kick");
+                                var otherUser = await Utils.GetUser(args, guild);
+                                if (otherUser == null) throw new ParsingError("KICK must be given a valid user in parameter");
+                                var roles = guild.Roles.Select(x => x.Id).ToList();
+                                roles.Remove(guild.Id);
+                                if (me.RoleIds.Min(x => roles.ToList().IndexOf(x)) > otherUser.RoleIds.Min(x => roles.ToList().IndexOf(x)))
+                                    throw new ParsingError("KICK can't be called on an user with higher permissions than mine");
+                                argsObj = otherUser;
+                                break;
+
+                            default:
+                                throw new ArgumentException("Invalid order " + order.ToString());
+                        }
                         commands.Add(new Command
                         {
                             order = order,
-                            arg = tmpSplit.Length > 0 ? string.Join(" ", tmpSplit.Skip(1)) : null
+                            arg = argsObj
                         });
                         goto success;
                     }

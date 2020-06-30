@@ -4,6 +4,7 @@
     {
         SAY, // Say something
         KICK, // Kick an user
-        CREATE // Create a channel
+        CREATE, // Create a channel
+        DESTROY, // Destroy a channel
     }
 }
