@@ -104,6 +104,7 @@ namespace Tami.Commands
             }
             catch (Exception e)
             {
+                await Utils.LogError(new LogMessage(LogSeverity.Error, e.Source, e.Message, e));
                 await Context.Channel.SendMessageAsync(e.Message);
             }
         }
@@ -147,9 +148,9 @@ namespace Tami.Commands
                                 if (args.Length == 0) throw new ParsingError("KICK must be given the user name to kick");
                                 var otherUser = await Utils.GetUser(args, guild);
                                 if (otherUser == null) throw new ParsingError("KICK must be given a valid user in parameter");
-                                var roles = guild.Roles.Select(x => x.Id).ToList();
-                                roles.Remove(guild.Id);
-                                if (me.RoleIds.Min(x => roles.ToList().IndexOf(x)) > otherUser.RoleIds.Min(x => roles.ToList().IndexOf(x)))
+                                var roles = guild.Roles.ToList();
+                                roles.RemoveAll(x => x.Id == guild.Id);
+                                if (me.RoleIds.Where(x => x != guild.Id).Max(x => roles.Where(y => y.Id == x).First().Position) <= otherUser.RoleIds.Where(x => x != guild.Id).Max(x => roles.Where(y => y.Id == x).First().Position))
                                     throw new ParsingError("KICK can't be called on an user with higher permissions than mine");
                                 argsObj = otherUser;
                                 break;
