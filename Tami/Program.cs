@@ -62,7 +62,7 @@ namespace Tami
             {
                 SocketCommandContext context = new SocketCommandContext(Client, msg);
                 if (!(await _commands.ExecuteAsync(context, pos, null)).IsSuccess)
-                    await Manager.LaunchCommandAsync(context, pos);
+                    _ = Task.Run(async () => await Manager.LaunchCommandAsync(context, pos));
             }
         }
     }

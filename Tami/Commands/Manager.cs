@@ -1,4 +1,5 @@
-﻿using Discord.Commands;
+﻿using Discord;
+using Discord.Commands;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,6 +19,51 @@ namespace Tami.Commands
             if (commands == null || commands.Length == 0) // Invalid command
                 return;
 
+            var res = await Context.Channel.SendMessageAsync(embed: new EmbedBuilder
+            {
+                Color = Color.Blue,
+                Title = "Vote in progress...",
+                Description = "Command: " + msg,
+                Footer = new EmbedFooterBuilder
+                {
+                    Text = "Vote will end in one minute"
+                }
+            }.Build());
+            var yes = new Emoji("✅");
+            var no = new Emoji("❌");
+            await res.AddReactionsAsync(new[] { yes, no });
+
+            await Task.Delay(6000); // 60000 ms = 1 min
+
+            await res.UpdateAsync();
+            var countYes = res.Reactions.Where(x => x.Key.Name == yes.Name).First().Value.ReactionCount - 1;
+            var countNo = res.Reactions.Where(x => x.Key.Name == no.Name).First().Value.ReactionCount - 1;
+
+            if (countNo >= countYes)
+            {
+                await res.ModifyAsync(x => x.Embed = new EmbedBuilder
+                {
+                    Color = Color.Red,
+                    Title = "Vote failed",
+                    Description = "Command: " + msg,
+                    Footer = new EmbedFooterBuilder
+                    {
+                        Text = countYes + " - " + countNo
+                    }
+                }.Build());
+                return;
+            }
+
+            await res.ModifyAsync(x => x.Embed = new EmbedBuilder
+            {
+                Color = Color.Green,
+                Title = "Vote succeed",
+                Description = "Command: " + msg,
+                Footer = new EmbedFooterBuilder
+                {
+                    Text = countYes + " - " + countNo
+                }
+            }.Build());
             foreach (var cmd in commands)
             {
                 switch (cmd.order)
