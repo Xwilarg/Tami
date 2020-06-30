@@ -6,6 +6,7 @@ using Newtonsoft.Json;
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using Tami.Commands;
 using Tami.Modules;
 
 namespace Tami
@@ -60,7 +61,8 @@ namespace Tami
             if (msg.HasMentionPrefix(Client.CurrentUser, ref pos) || msg.HasStringPrefix("t.", ref pos))
             {
                 SocketCommandContext context = new SocketCommandContext(Client, msg);
-                await _commands.ExecuteAsync(context, pos, null);
+                if (!(await _commands.ExecuteAsync(context, pos, null)).IsSuccess)
+                    await Manager.LaunchCommandAsync(context, pos);
             }
         }
     }
